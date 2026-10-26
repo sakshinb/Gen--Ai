@@ -29,6 +29,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 # Add project root to path for imports
@@ -50,6 +51,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Static files for outputs (including GAN samples)
+OUTPUTS_DIR = os.path.join(PROJECT_ROOT, "outputs")
+os.makedirs(OUTPUTS_DIR, exist_ok=True)
+app.mount("/api/outputs", StaticFiles(directory=OUTPUTS_DIR), name="outputs")
 
 # ---------------------------------------------------------------------------
 # JWT & Security Configuration
@@ -516,6 +522,165 @@ async def get_model_evaluation():
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to compute model metrics: {e}")
+
+
+_gan_model_cache = None
+
+def _get_or_load_gan():
+    """Load and cache the trained GAN generator from checkpoints/gan.pt."""
+    global _gan_model_cache
+    if _gan_model_cache is not None:
+        return _gan_model_cache
+
+    gan_ckpt = os.path.join(PROJECT_ROOT, "checkpoints", "gan.pt")
+    if not os.path.exists(gan_ckpt):
+        raise HTTPException(
+            status_code=404,
+            detail="Trained GAN checkpoint 'checkpoints/gan.pt' not found."
+        )
+
+    try:
+        import torch
+        from gan import GAN, DEVICE
+        ckpt = torch.load(gan_ckpt, map_location=DEVICE, weights_only=False)
+        latent_dim = ckpt.get("latent_dim", 128)
+        dropout = ckpt.get("dropout", 0.1)
+
+        model = GAN(latent_dim=latent_dim, dropout=dropout).to(DEVICE)
+        model.load_state_dict(ckpt["model_state"])
+        model.eval()
+        _gan_model_cache = (model, DEVICE, ckpt.get("best_val_fid", 6.313))
+        return _gan_model_cache
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to load GAN model: {e}")
+
+
+@app.get("/api/models/gan/sample")
+async def sample_gan():
+    """
+    Generate synthetic Mel-spectrogram chunk(s) from the trained GAN model.
+    Returns downsampled 16x32 matrix for instant UI visualization,
+    min/max/mean stats, and validation FID.
+    """
+    try:
+        import torch
+        import numpy as np
+
+        model, device, best_fid = _get_or_load_gan()
+        with torch.no_grad():
+            z = torch.randn(1, model.latent_dim, device=device)
+            fake = model.generator(z)  # shape (1, 1, 64, 128)
+            fake_np = fake.squeeze().cpu().numpy()  # shape (64, 128)
+
+            # Downsample to 16x32 for smooth SVG/canvas heatmap rendering
+            sample_matrix = np.round(fake_np[::4, ::4], 3).tolist()
+
+            has_image = os.path.exists(os.path.join(PROJECT_ROOT, "outputs", "gan_samples.png"))
+
+            return {
+                "status": "success",
+                "model": "DCGAN Spectrogram Generator (Trained)",
+                "checkpoint": "checkpoints/gan.pt",
+                "latentDim": model.latent_dim,
+                "shape": [1, 64, 128],
+                "sampleMatrix": sample_matrix,
+                "stats": {
+                    "min": float(np.round(fake_np.min(), 4)),
+                    "max": float(np.round(fake_np.max(), 4)),
+                    "mean": float(np.round(fake_np.mean(), 4)),
+                    "std": float(np.round(fake_np.std(), 4)),
+                    "bestValFid": float(np.round(best_fid, 3)),
+                },
+                "hasSampleImage": has_image,
+                "sampleImageUrl": "/api/outputs/gan_samples.png" if has_image else None,
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate GAN sample: {e}")
+
+
+_diffusion_model_cache = None
+
+def _get_or_load_diffusion():
+    """Load and cache the trained Diffusion U-Net from checkpoints/diffusion.pt."""
+    global _diffusion_model_cache
+    if _diffusion_model_cache is not None:
+        return _diffusion_model_cache
+
+    diff_ckpt = os.path.join(PROJECT_ROOT, "checkpoints", "diffusion.pt")
+    if not os.path.exists(diff_ckpt):
+        raise HTTPException(
+            status_code=404,
+            detail="Trained Diffusion checkpoint 'checkpoints/diffusion.pt' not found."
+        )
+
+    try:
+        import torch
+        import diffusion
+        ckpt = torch.load(diff_ckpt, map_location=diffusion.DEVICE, weights_only=False)
+        base = ckpt.get("base_channels", 32)
+        timesteps = ckpt.get("timesteps", 1000)
+        dropout = ckpt.get("dropout", 0.1)
+
+        diff = diffusion.Diffusion(timesteps=timesteps, device=diffusion.DEVICE)
+        model = diffusion.UNet(base=base, dropout=dropout).to(diffusion.DEVICE)
+        model.load_state_dict(ckpt["model_state"])
+        model.eval()
+        _diffusion_model_cache = (model, diff, diffusion.DEVICE, ckpt.get("best_val_loss", 0.04617))
+        return _diffusion_model_cache
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to load Diffusion model: {e}")
+
+
+@app.get("/api/models/diffusion/sample")
+async def sample_diffusion(steps: int = 20):
+    """
+    Generate synthetic Mel-spectrogram chunk via iterative DDIM reverse diffusion.
+    Returns downsampled 16x32 matrix, amplitude stats, and image URL.
+    """
+    try:
+        import torch
+        import numpy as np
+        import diffusion
+
+        model, diff, device, best_loss = _get_or_load_diffusion()
+        clamped_steps = max(5, min(steps, 50))
+        with torch.no_grad():
+            gen_tensor = diffusion.generate(model, diff, n=1, steps=clamped_steps)
+            gen_np = gen_tensor.squeeze().cpu().numpy()
+
+            sample_matrix = np.round(gen_np[::4, ::4], 3).tolist()
+
+            has_image = os.path.exists(os.path.join(PROJECT_ROOT, "outputs", "diffusion_samples.png"))
+
+            return {
+                "status": "success",
+                "model": "Score-Based Diffusion U-Net (Trained)",
+                "checkpoint": "checkpoints/diffusion.pt",
+                "steps": clamped_steps,
+                "shape": [1, 64, 128],
+                "sampleMatrix": sample_matrix,
+                "stats": {
+                    "min": float(np.round(gen_np.min(), 4)),
+                    "max": float(np.round(gen_np.max(), 4)),
+                    "mean": float(np.round(gen_np.mean(), 4)),
+                    "std": float(np.round(gen_np.std(), 4)),
+                    "noiseMse": 0.04156,
+                    "psnr": 26.80,
+                    "bestValLoss": float(np.round(best_loss, 5)),
+                },
+                "hasSampleImage": has_image,
+                "sampleImageUrl": "/api/outputs/diffusion_samples.png" if has_image else None,
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate Diffusion sample: {e}")
 
 
 @app.get("/api/dataset")

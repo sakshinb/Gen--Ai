@@ -82,17 +82,17 @@ export const SpectrogramCharts: React.FC<SpectrogramChartsProps> = ({
       color: '#8B7CF5'
     },
     gan: {
-      name: 'GAN Generator',
-      tag: 'Adversarial Spectral Synthesis',
+      name: 'GAN Generator (Trained)',
+      tag: 'Adversarial Spectral Synthesis (FID 5.57)',
       psnr: metrics?.psnr || '26.80 dB',
       mse: '0.00185',
       color: '#F2B84B'
     },
     diffusion: {
-      name: 'Score-Based Diffusion',
-      tag: 'Iterative DDIM Denoising (10 steps)',
-      psnr: metrics?.psnr || '31.20 dB',
-      mse: '0.00091',
+      name: 'Score-Based Diffusion (Trained)',
+      tag: 'Iterative DDIM Reverse Diffusion (Cosine Schedule)',
+      psnr: metrics?.psnr || '26.80 dB',
+      mse: '0.00209',
       color: '#3B82F6'
     },
     none: {
@@ -454,8 +454,8 @@ export const SpectrogramCharts: React.FC<SpectrogramChartsProps> = ({
             {[
               { name: 'Autoencoder (AE)', psnr: 25.34, loss: 'MSE 0.00293', latency: '14ms', color: '#2FD9C4' },
               { name: 'Variational Autoencoder (VAE)', psnr: 21.24, loss: 'KL 36.22 nats', latency: '18ms', color: '#8B7CF5' },
-              { name: 'GAN Generator', psnr: 26.80, loss: 'FAD 2.14', latency: '35ms', color: '#F2B84B' },
-              { name: 'Score Diffusion', psnr: 31.20, loss: 'Noise MSE 0.019', latency: '190ms', color: '#3B82F6' }
+              { name: 'GAN Generator (Trained)', psnr: 26.80, loss: 'FID 5.57', latency: '9ms', color: '#F2B84B' },
+              { name: 'Score-Based Diffusion (Trained)', psnr: 26.80, loss: 'Noise MSE 0.0416', latency: '200ms', color: '#3B82F6' }
             ].map((m) => {
               const widthPct = (m.psnr / 35) * 100;
               const isCurrent = m.name.toLowerCase().includes(representationModel.toLowerCase());

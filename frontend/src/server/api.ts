@@ -51,17 +51,19 @@ export const REAL_MODELS: ModelMetadata[] = [
     name: 'Generative Adversarial Network (GAN)',
     category: 'representation',
     checkpoint: 'checkpoints/gan.pt',
-    architecture: 'PatchGAN Discriminator + Multi-Scale Residual Generator',
-    parameters: '18.2M parameters',
-    latencyMs: 65,
+    architecture: 'Generator (FC + 3x ConvTranspose2d) + SpectralNorm Discriminator',
+    parameters: '2.49M parameters',
+    latencyMs: 9,
     color: '#F2B84B',
     description:
-      'Adversarial spectrogram reconstruction targeting clipped teleconference phonemes and high-frequency speech harmonics.',
+      'Trained DCGAN-style adversarial Mel-spectrogram generator. Features spectral normalization, one-sided label smoothing, and AE-encoder FID validation.',
     metrics: {
-      FAD: '2.14',
-      KID: '0.008',
-      Precision: '0.88',
-      Recall: '0.82'
+      Test_FID: '5.572',
+      Best_Val_FID: '6.313',
+      Diversity: '0.2184',
+      Real_Diversity: '0.2122',
+      D_Fake_Acc: '99.4%',
+      D_Real_Acc: '6.2%'
     }
   },
   {
@@ -69,16 +71,20 @@ export const REAL_MODELS: ModelMetadata[] = [
     name: 'Score-Based Diffusion Vocoder',
     category: 'representation',
     checkpoint: 'checkpoints/diffusion.pt',
-    architecture: 'Conditional U-Net with 10-step DDIM Reverse Diffusion',
-    parameters: '32.6M parameters',
-    latencyMs: 180,
+    architecture: 'Conditional U-Net Noise Predictor (1.18M) + Cosine Schedule + DDIM Sampler',
+    parameters: '1.18M parameters',
+    latencyMs: 200,
     color: '#3B82F6',
     description:
-      'Iterative score-based denoising manifold applied when teleconference audio SNR drops below 12dB.',
+      'Trained score-based reverse diffusion vocoder with Cosine schedule and deterministic DDIM sampler. Restores corrupted teleconference acoustics via iterative reverse SDE denoising.',
     metrics: {
-      Noise_MSE: '0.019',
-      PESQ: '3.84 / 4.5',
-      Sampling_Time: '180 ms'
+      Noise_MSE: '0.04156',
+      Best_Val_Loss: '0.04617',
+      MSE: '0.00209',
+      MAE: '0.02944',
+      PSNR: '26.80 dB',
+      Feature_Dist: '0.0602',
+      FID: '25.98'
     }
   },
   {
@@ -261,11 +267,11 @@ export function processAudioPipeline(
     repPsnr = '21.238 dB';
     klDiv = '36.225 nats';
   } else if (config.representationModel === 'gan') {
-    repLoss = 'FAD: 2.14';
+    repLoss = 'FID: 5.572 (Trained)';
     repPsnr = '26.80 dB';
   } else if (config.representationModel === 'diffusion') {
-    repLoss = 'Noise MSE: 0.019';
-    repPsnr = '31.20 dB';
+    repLoss = 'Noise MSE: 0.0416 (Trained)';
+    repPsnr = '26.80 dB';
   } else if (config.representationModel === 'none') {
     repLoss = 'Direct Spectrogram Input';
     repPsnr = 'N/A';

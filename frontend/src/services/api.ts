@@ -10,7 +10,7 @@ import {
 /**
  * API base URL — read from environment variable, defaults to empty (relative) or localhost:8000.
  */
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 /**
  * Job status response from the backend.
@@ -234,6 +234,64 @@ export const ApiService = {
     const response = await fetch(`${API_BASE}/api/dataset`);
     if (!response.ok) {
       throw new Error(`Failed to fetch dataset info: ${response.status}`);
+    }
+    return await response.json();
+  },
+
+  /**
+   * Sample synthetic Mel-spectrogram chunk from the trained GAN model.
+   */
+  async sampleGan(): Promise<{
+    status: string;
+    model: string;
+    checkpoint: string;
+    latentDim: number;
+    shape: number[];
+    sampleMatrix: number[][];
+    stats: {
+      min: number;
+      max: number;
+      mean: number;
+      std: number;
+      bestValFid: number;
+    };
+    hasSampleImage: boolean;
+    sampleImageUrl?: string | null;
+  }> {
+    const response = await fetch(`${API_BASE}/api/models/gan/sample`);
+    if (!response.ok) {
+      const errBody = await response.json().catch(() => ({}));
+      throw new Error(errBody.detail || `Failed to generate GAN sample: ${response.status}`);
+    }
+    return await response.json();
+  },
+
+  /**
+   * Sample synthetic Mel-spectrogram chunk from the trained Diffusion vocoder.
+   */
+  async sampleDiffusion(steps: number = 20): Promise<{
+    status: string;
+    model: string;
+    checkpoint: string;
+    steps: number;
+    shape: number[];
+    sampleMatrix: number[][];
+    stats: {
+      min: number;
+      max: number;
+      mean: number;
+      std: number;
+      noiseMse: number;
+      psnr: number;
+      bestValLoss: number;
+    };
+    hasSampleImage: boolean;
+    sampleImageUrl?: string | null;
+  }> {
+    const response = await fetch(`${API_BASE}/api/models/diffusion/sample?steps=${steps}`);
+    if (!response.ok) {
+      const errBody = await response.json().catch(() => ({}));
+      throw new Error(errBody.detail || `Failed to generate Diffusion sample: ${response.status}`);
     }
     return await response.json();
   }

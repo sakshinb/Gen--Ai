@@ -1,0 +1,57 @@
+{
+  "settings": {
+    "N_GEN": 500,
+    "DDIM_STEPS": 50,
+    "REFINE_T": 250,
+    "device": "cuda"
+  },
+  "fid_floor_real_vs_real": 5.768571505146156,
+  "representation_models": {
+    "AE": {
+      "MSE": 0.0029254491,
+      "MAE": 0.0334491134,
+      "PSNR (dB)": 25.3380746107,
+      "SSIM": 0.9746365547,
+      "FID": 4.6684077848,
+      "Diversity ratio": 0.9473817884
+    },
+    "VAE": {
+      "MSE": 0.0060031312,
+      "MAE": 0.0479785092,
+      "PSNR (dB)": 22.2162216791,
+      "SSIM": 0.9460211396,
+      "FID": 5.0536624802,
+      "Diversity ratio": 0.8508430901
+    },
+    "GAN": {
+      "MSE": null,
+      "MAE": null,
+      "PSNR (dB)": null,
+      "SSIM": null,
+      "FID": 6.1602097371,
+      "Diversity ratio": 1.0641780358
+    },
+    "Diffusion": {
+      "MSE": 0.0021298071,
+      "MAE": 0.0299912896,
+      "PSNR (dB)": 26.7165972198,
+      "SSIM": 0.9821436405,
+      "FID": 24.3223100851,
+      "Diversity ratio": 1.261987538
+    }
+  },
+  "asr_nlp": {
+    "WER": 0.14285714285714285,
+    "CER": 0.06451612903225806,
+    "ROUGE-1": 0.7199999999999999,
+    "ROUGE-2": 0.2608695652173913,
+    "ROUGE-L": 0.64,
+    "BERTScore": 0.9418498277664185,
+    "Decisions Precision": 0.5,
+    "Decisions Recall": 1.0,
+    "Decisions F1": 0.6666666666666666,
+    "Actions Precision": 1.0,
+    "Actions Recall": 1.0,
+    "Actions F1": 1.0
+  }
+}

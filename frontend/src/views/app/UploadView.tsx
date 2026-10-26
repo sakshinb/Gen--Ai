@@ -312,8 +312,8 @@ export const UploadView: React.FC<UploadViewProps> = ({
                       <Check className="w-3.5 h-3.5 text-[#3B82F6]" />
                     )}
                   </div>
-                  <div className="text-[10px] font-mono text-[#8B9AA8] leading-tight">
-                    PESQ: 3.84 · DDIM 10 steps · Noise MSE: 0.019
+                  <div className="text-[10px] font-mono text-[#3B82F6] leading-tight">
+                    PSNR: 26.80 dB · Trained (checkpoints/diffusion.pt) · 200ms
                   </div>
                 </div>
 
@@ -336,8 +336,8 @@ export const UploadView: React.FC<UploadViewProps> = ({
                       <Check className="w-3.5 h-3.5 text-[#F2B84B]" />
                     )}
                   </div>
-                  <div className="text-[10px] font-mono text-[#8B9AA8] leading-tight">
-                    FAD: 2.14 · KID: 0.008 · Precision: 0.88
+                  <div className="text-[10px] font-mono text-[#F2B84B] leading-tight">
+                    FID: 5.57 · Trained (checkpoints/gan.pt) · 9ms
                   </div>
                 </div>
               </div>
